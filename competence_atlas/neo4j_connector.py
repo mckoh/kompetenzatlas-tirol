@@ -1,7 +1,7 @@
 from neo4j import GraphDatabase
 from ollama import chat
 
-from .extractor import embed
+from .extractor import embed, Extraction
 from .constant import SCHEMA_COMPANY, SCHEMA_COMPETENCE
 from .constant import LANG_MODEL, INFERENCE_TEMPERATUR, CONTEXT_SIZE
 from .constant import USER, PASSWORD
@@ -22,12 +22,12 @@ def init_schema():
                 `vector.dimensions`: {DIM},
                 `vector.similarity_function`: 'cosine'}}}}""")
 
-def store(ex, source_url: str, chunk_text: str):
-    comp_vecs = embed(ex.competences) if ex.competences else []
+def store(extraction:Extraction, source_url: str, chunk_text: str):
+    comp_vecs = embed(extraction.competences) if extraction.competences else []
     chunk_vec = embed([chunk_text])[0]
     with driver.session() as session:
-        session.run("MERGE (c:Company {name:$n})", n=ex.company_name)
-        for name, vec in zip(ex.competences, comp_vecs):
+        session.run("MERGE (c:Company {name:$n})", n=extraction.company_name)
+        for name, vec in zip(extraction.competences, comp_vecs):
             session.run("""
               MATCH (c:Company {name:$company})
               MERGE (k:Competence {name:$k})
@@ -35,19 +35,19 @@ def store(ex, source_url: str, chunk_text: str):
               CALL db.create.setNodeVectorProperty(k, 'embedding', $vec)
               MERGE (c)-[r:HAS_COMPETENCE]->(k)
               SET r.source = $src""",
-              company=ex.company_name, k=name, vec=vec, src=source_url)
-        for p in ex.partners:
+              company=extraction.company_name, k=name, vec=vec, src=source_url)
+        for p in extraction.partners:
             session.run("""
               MATCH (c:Company {name:$company})
               MERGE (p:Company {name:$p})
-              MERGE (c)-[:PARTNER_OF]->(p)""", company=ex.company_name, p=p)
+              MERGE (c)-[:PARTNER_OF]->(p)""", company=extraction.company_name, p=p)
         session.run("""
           MATCH (c:Company {name:$company})
           CREATE (ch:Chunk {text:$t, source_url:$src})
           WITH c, ch
           CALL db.create.setNodeVectorProperty(ch, 'embedding', $vec)
           CREATE (ch)-[:ABOUT]->(c)""",
-          company=ex.company_name, t=chunk_text, src=source_url, vec=chunk_vec)
+          company=extraction.company_name, t=chunk_text, src=source_url, vec=chunk_vec)
 
 def retrieve(question: str, k: int = 5) -> str:
     qvec = embed([question])[0]
