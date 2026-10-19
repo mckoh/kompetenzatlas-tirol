@@ -1,0 +1,6 @@
+ollama
+neo4j
+pydantic
+requests
+beautifulsoup4
+jupyter
