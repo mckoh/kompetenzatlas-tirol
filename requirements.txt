@@ -3,4 +3,5 @@ neo4j
 pydantic
 requests
 beautifulsoup4
-jupyter
+ipython
+python-epo-ops-client
